@@ -23,9 +23,9 @@
 <meta name="theme-color" content="#ffffff">
 <link rel="stylesheet" type="text/css" href="/files/assets/site.css?id=0a7f3283cc0ec016754331bfbb5b375e">
 <script data-cfasync="false" type="text/javascript">(function(w, d) { var s = d.createElement("script"); s.src = "//delivery.adrecover.com/42928/adRecover.js"; s.type = "text/javascript"; s.async = true; (d.getElementsByTagName("head")[0] || d.getElementsByTagName("body")[0]).appendChild(s); })(window, document);</script>
-<script src="https://papayads.net/clnt/onepiecechapters/v3/adtags.js" type="476071298a18ee4114aa920e-text/javascript"></script>
+<script src="https://papayads.net/clnt/onepiecechapters/v3/adtags.js" type="f20e9e465dc1fd2179ba709f-text/javascript"></script>
 <div id="protag-header"></div>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     window.googletag = window.googletag || { cmd: [] };
     window.protag = window.protag || { cmd: [] };
     window.protag.cmd.push(function () {
@@ -33,23 +33,23 @@
     });
 </script>
 
-<script type="476071298a18ee4114aa920e-text/javascript" async="async" src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"></script>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript" async="async" src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"></script>
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     window.googletag = window.googletag || { cmd: [] };
     window.googletag.cmd.push(function () {
         window.googletag.pubads();
     });
 </script>
 
-<script type="476071298a18ee4114aa920e-text/javascript" async="async" src="https://protagcdn.com/s/onepiecechapters.com/site.js"></script>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript" async="async" src="https://protagcdn.com/s/onepiecechapters.com/site.js"></script>
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     window.protag = window.protag || { cmd: [] };
     window.protag.config = { s:'onepiecechapters.com', childADM: '22776341912', l: 'Arf30PQf' };
     window.protag.cmd.push(function () {
         window.protag.pageInit();
     });
 </script>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
    window.googletag = window.googletag || { cmd: [] };
    window.protag = window.protag || { cmd: [] };
    window.protag.cmd.push(function () {
@@ -57,16 +57,16 @@
    });
 </script>
 
-<script async src="https://www.googletagmanager.com/gtag/js?id=UA-153518836-3" type="476071298a18ee4114aa920e-text/javascript"></script>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-153518836-3" type="f20e9e465dc1fd2179ba709f-text/javascript"></script>
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
 
   gtag('config', 'UA-153518836-3');
 </script>
-<script async='async' src='https://securepubads.g.doubleclick.net/tag/js/gpt.js' type="476071298a18ee4114aa920e-text/javascript"></script>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script async='async' src='https://securepubads.g.doubleclick.net/tag/js/gpt.js' type="f20e9e465dc1fd2179ba709f-text/javascript"></script>
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
   var googletag = googletag || {};
   googletag.cmd = googletag.cmd || [];
   googletag.cmd.push(function() {
@@ -75,7 +75,7 @@
   });
 </script>
 
-<script async src="https://powerad.ai/132298269347600/script.js" type="476071298a18ee4114aa920e-text/javascript"></script>
+<script async src="https://powerad.ai/132298269347600/script.js" type="f20e9e465dc1fd2179ba709f-text/javascript"></script>
 
 </head>
 <body class="font-body antialiased text-white bg-body">
@@ -111,7 +111,7 @@
 <div class="flex items-center justify-between">
 <div class="mx-auto m-3">
 <div id="protag-in_content"></div>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     window.googletag = window.googletag || { cmd: [] };
     window.protag = window.protag || { cmd: [] };
     window.protag.cmd.push(function () {
@@ -165,7 +165,7 @@
 <div>
 <div class="text-gray-400 uppercase text-xs">Next Chapter Progress</div>
 <div class="bg-gray rounded-full text-xs">
-<div class="w-full text-center text-white px-2 rounded-full">Waiting For Next Chapter</div>
+<div class="w-1/4 text-center text-white bg-red px-2 rounded-full">Translating</div>
 </div>
 </div>
 </div>
@@ -251,7 +251,7 @@
 <div>
 <div class="text-gray-400 uppercase text-xs">Next Chapter Progress</div>
 <div class="bg-gray rounded-full text-xs">
-<div class="w-full text-center text-white px-2 rounded-full">Waiting For Next Chapter</div>
+<div class="w-1/4 text-center text-white bg-red px-2 rounded-full">Translating</div>
 </div>
 </div>
 </div>
@@ -269,7 +269,7 @@
 <div>
 <div class="text-gray-400 uppercase text-xs">Next Chapter Progress</div>
 <div class="bg-gray rounded-full text-xs">
-<div class="w-full text-center text-white px-2 rounded-full">Waiting For Next Chapter</div>
+<div class="w-1/4 text-center text-white bg-red px-2 rounded-full">Translating</div>
 </div>
 </div>
 </div>
@@ -335,13 +335,13 @@
 
 <div id="ReadHeroAcademia_5_PapayAds_STICKY_Footer" align="center" class="leaderboard-sticky">
 <div id='div-gpt-ad-1633192071946-0'>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     googletag.cmd.push(function() { googletag.display('div-gpt-ad-1633192071946-0'); });
   </script>
 </div>
 </div>
 <div id="protag-sidebar"></div>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     window.googletag = window.googletag || { cmd: [] };
     window.protag = window.protag || { cmd: [] };
     window.protag.cmd.push(function () {
@@ -355,7 +355,7 @@
 <div class="flex items-center justify-between">
 <div class="mx-auto m-3">
 <div id="protag-before_content"></div>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     window.googletag = window.googletag || { cmd: [] };
     window.protag = window.protag || { cmd: [] };
     window.protag.cmd.push(function () {
@@ -365,7 +365,7 @@
 
 <div id="OnePieceChapters_5_PapayAds_STICKY_Footer" align="center" class="leaderboard-sticky">
 <div id='div-gpt-ad-1631024515905-0'>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     googletag.cmd.push(function() { googletag.display('div-gpt-ad-1631024515905-0'); });
   </script>
 </div>
@@ -373,7 +373,7 @@
 <center>
 <div id="OnePieceChapters_2_PapayAds_BOTTOM_Banner" align="center">
 <div id='div-gpt-ad-1631021372877-0'>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
     googletag.cmd.push(function() { googletag.display('div-gpt-ad-1631021372877-0'); });
   </script>
 </div>
@@ -393,13 +393,13 @@
 </div>
 </div>
 </main>
-<script type="476071298a18ee4114aa920e-application/javascript" src="/files/assets/site.js?id=0075c6193f83346e1a17fba5779ec50f"></script>
-<script type="476071298a18ee4114aa920e-text/javascript">
+<script type="f20e9e465dc1fd2179ba709f-application/javascript" src="/files/assets/site.js?id=0075c6193f83346e1a17fba5779ec50f"></script>
+<script type="f20e9e465dc1fd2179ba709f-text/javascript">
                     window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};
                     ga.l=+new Date;
                     ga('create', 'UA-153518836-3', 'auto');
                     ga('send', 'pageview');
                 </script>
-<script async src='https://www.google-analytics.com/analytics.js' type="476071298a18ee4114aa920e-text/javascript"></script>
-<script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js" data-cf-settings="476071298a18ee4114aa920e-|49" defer=""></script></body>
+<script async src='https://www.google-analytics.com/analytics.js' type="f20e9e465dc1fd2179ba709f-text/javascript"></script>
+<script src="/cdn-cgi/scripts/7d0fa10a/cloudflare-static/rocket-loader.min.js" data-cf-settings="f20e9e465dc1fd2179ba709f-|49" defer=""></script></body>
 </html>
