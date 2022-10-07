@@ -1,3 +1,2 @@
-https://onepiecechapters.com/projects 
-
-projects.json
+# tcbscrape
+Script to scrape tcbscans website. 
