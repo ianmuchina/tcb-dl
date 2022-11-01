@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -17,6 +19,10 @@ type Project struct {
 	Url         string    `json:"Url"`
 	Image       string    `json:"Image,omitempty"`
 	Chapters    []Chapter `json:"Chapters,omitempty"`
+}
+
+func (Project) updateChapters() {
+
 }
 
 type Chapter struct {
@@ -33,20 +39,22 @@ type Image struct {
 
 const base = "https://onepiecechapters.com"
 
+// HTTP Client
+var httpClient = &http.Client{
+	Timeout: time.Second * 10,
+}
+
 func main() {
-	// Download Latest Projects from the internet
 	Projects := updateProjects()
-	// For each Project, Get all chapter Links and Images
-	// TODO: Concurrency
-	for p := range Projects {
-		Projects[p].Chapters = getProjectChapters(Projects[p].Url)
-		for c := range Projects[p].Chapters {
-			// Download Chapter Images
-			// TODO: Concurrency
-			Projects[p].Chapters[c].Images = getChapterImages(Projects[p].Chapters[c].Url)
-			fmt.Println("Prj:", p, "Ch.", c)
+	for i := 0; i < len(Projects); i++ {
+		Projects[i].Chapters = getProjectChapters(Projects[i].Url)
+
+		for c := 0; c < len(Projects[i].Chapters); c++ {
+			Projects[i].Chapters[c].Images = getChapterImages(Projects[i].Chapters[c].Url)
+			fmt.Println("Prj:", i, "Ch.", c)
 		}
 	}
+
 	saveProjectsToDisk(Projects)
 }
 
@@ -158,13 +166,15 @@ func getChapterImages(url string) []Image {
 }
 
 func fetch(url string) *goquery.Document {
-	res, err := http.Get(url)
+	res, err := httpClient.Get(url)
 	if err != nil {
 		log.Fatal(err, "Failed to get Latest Chapters")
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+		body, _ := ioutil.ReadAll(res.Body)
+		res.Body.Close()
+		log.Fatalf("status code error: %d %s\n%s", res.StatusCode, res.Status, body)
 	}
 	// Load the HTML document
 	doc, err := goquery.NewDocumentFromReader(res.Body)
