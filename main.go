@@ -69,9 +69,7 @@ func mainOld() {
 	}
 
 	saveProjectsToDisk(Projects)
-}
 
-func main() {
 	data, err := os.ReadFile("./projects.json")
 	if err != nil {
 		log.Fatal(err)
