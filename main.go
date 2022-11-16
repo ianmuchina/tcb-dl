@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -21,10 +22,6 @@ type Project struct {
 	Chapters    []Chapter `json:"Chapters,omitempty"`
 }
 
-func (Project) updateChapters() {
-
-}
-
 type Chapter struct {
 	Title       string  `json:",omitempty"`
 	Url         string  `json:",omitempty"`
@@ -37,6 +34,22 @@ type Image struct {
 	Alt string
 }
 
+type CubariManga struct {
+	Title       string                   `json:"title"`
+	Description string                   `json:"description"`
+	Artist      string                   `json:"artist"`
+	Author      string                   `json:"author"`
+	Cover       string                   `json:"cover"`
+	Chapters    map[string]CubariChapter `json:"chapters"`
+}
+
+type CubariChapter struct {
+	Title        string              `json:"title"`
+	Volume       string              `json:"volume"`
+	Groups       map[string][]string `json:"groups"`
+	Last_updated string
+}
+
 const base = "https://onepiecechapters.com"
 
 // HTTP Client
@@ -44,7 +57,7 @@ var httpClient = &http.Client{
 	Timeout: time.Second * 10,
 }
 
-func main() {
+func mainOld() {
 	Projects := updateProjects()
 	for i := 0; i < len(Projects); i++ {
 		Projects[i].Chapters = getProjectChapters(Projects[i].Url)
@@ -56,6 +69,72 @@ func main() {
 	}
 
 	saveProjectsToDisk(Projects)
+}
+
+func main() {
+	data, err := os.ReadFile("./projects.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tmp := []Project{}
+	err = json.Unmarshal(data, &tmp)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// fmt.Println(tmp)
+
+	for _, m := range ExportCubariData(tmp) {
+		os.Mkdir("./data", 0755)
+		filename := "./data/" + m.Title + ".json"
+		filename = strings.ReplaceAll(filename, " ", "_")
+		fmt.Println(filename)
+		json, err := json.MarshalIndent(m, "", "\t")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = os.WriteFile(filename, json, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func ExportCubariData(Projects []Project) []CubariManga {
+	var Result []CubariManga
+	for _, P := range Projects {
+		Manga := CubariManga{
+			Title:       P.Title,
+			Description: P.Description,
+			Artist:      "Unknown",
+			Author:      "Unknown",
+			Cover:       P.Image,
+			Chapters:    make(map[string]CubariChapter, len(P.Chapters)),
+		}
+
+		for _, C := range P.Chapters {
+			// Sort Chapter Images
+			var imgs []string
+			for _, I := range C.Images {
+				imgs = append(imgs, I.Src)
+			}
+			G := map[string][]string{
+				"tcbscans": imgs,
+			}
+
+			Chp := CubariChapter{
+				Title:  C.Title,
+				Groups: G,
+			}
+
+			Manga.Chapters[C.Title] = Chp
+		}
+
+		Result = append(Result, Manga)
+	}
+
+	return Result
 }
 
 func updateProjects() []Project {
@@ -103,7 +182,6 @@ func saveProjectsToDisk(Projects []Project) {
 
 func getProjectImageAndDescription(url string) (string, string) {
 	var description string = ""
-
 	// Fetch Project
 	fetch(base + url).
 		Find(".order-1").
@@ -172,7 +250,7 @@ func fetch(url string) *goquery.Document {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
+		body, _ := io.ReadAll(res.Body)
 		res.Body.Close()
 		log.Fatalf("status code error: %d %s\n%s", res.StatusCode, res.Status, body)
 	}
