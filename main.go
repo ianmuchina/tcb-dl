@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +25,7 @@ type Project struct {
 }
 
 type Chapter struct {
+	Index       string  `json:",omitempty"`
 	Title       string  `json:",omitempty"`
 	Url         string  `json:",omitempty"`
 	Description string  `json:",omitempty"`
@@ -57,19 +60,68 @@ var httpClient = &http.Client{
 	Timeout: time.Second * 10,
 }
 
-func mainOld() {
+var ChapterMap map[string]Chapter = make(map[string]Chapter, 4000)
+
+func main() {
+	P := loadLocalData()
+	updateChapterMap(P)
+
+	P = fetchNewChapters(P)
+	P = CleanData(P)
+
+	genCubariData(P)
+	saveProjectsToDisk(P)
+}
+
+func updateChapterMap(P []Project) {
+	for _, p := range P {
+		for _, c := range p.Chapters {
+			ChapterMap[c.Url] = c
+		}
+	}
+}
+
+func fetchNewChapters(P []Project) []Project {
 	Projects := updateProjects()
+
 	for i := 0; i < len(Projects); i++ {
 		Projects[i].Chapters = getProjectChapters(Projects[i].Url)
-
 		for c := 0; c < len(Projects[i].Chapters); c++ {
-			Projects[i].Chapters[c].Images = getChapterImages(Projects[i].Chapters[c].Url)
-			fmt.Println("Prj:", i, "Ch.", c)
+
+			ch := Projects[i].Chapters[c]
+			// If new chapter
+			if _, ok := ChapterMap[ch.Url]; !ok {
+				// fetch images
+				Projects[i].Chapters[c].Images = getChapterImages(Projects[i].Chapters[c].Url)
+				fmt.Println("New", ch.Title)
+			} else {
+				// Already seen
+				Projects[i].Chapters[c] = ChapterMap[ch.Url]
+			}
+		}
+	}
+	return Projects
+}
+
+func CleanData(Projects []Project) []Project {
+	re := regexp.MustCompile("[0-9.]+")
+
+	for i, p := range Projects {
+		for j, c := range p.Chapters {
+
+			x, err := strconv.ParseFloat(re.FindAllString(c.Title, -1)[0], 32)
+			if err != nil {
+				log.Fatal(err)
+			}
+			Projects[i].Chapters[j].Index = fmt.Sprintf("%g", x)
 		}
 	}
 
 	saveProjectsToDisk(Projects)
+	return Projects
+}
 
+func loadLocalData() []Project {
 	data, err := os.ReadFile("./projects.json")
 	if err != nil {
 		log.Fatal(err)
@@ -80,9 +132,11 @@ func mainOld() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// fmt.Println(tmp)
+	return tmp
+}
 
-	for _, m := range ExportCubariData(tmp) {
+func genCubariData(P []Project) {
+	for _, m := range ExportCubariData(P) {
 		os.Mkdir("./data", 0755)
 		filename := "./data/" + m.Title + ".json"
 		filename = strings.ReplaceAll(filename, " ", "_")
@@ -126,7 +180,7 @@ func ExportCubariData(Projects []Project) []CubariManga {
 				Groups: G,
 			}
 
-			Manga.Chapters[C.Title] = Chp
+			Manga.Chapters[C.Index] = Chp
 		}
 
 		Result = append(Result, Manga)
