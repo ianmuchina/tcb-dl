@@ -14,9 +14,12 @@ jobs:
 
       - name: Append new data to the json files
         run: go run .
+      - name: Set env
+        run: echo "COMMIT_MSG=$(cat commit_msg)" >> $GITHUB_ENV
+
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: Update
+          commit_message: ${{ env.COMMIT_MSG }}
           commit_user_name: GitHub Actions
           commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
           commit_author: Github Actions <41898282+github-actions[bot]@users.noreply.github.com>

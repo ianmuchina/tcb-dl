@@ -55,6 +55,8 @@ type CubariChapter struct {
 
 const base = "https://onepiecechapters.com"
 
+var commit_msg string = ""
+
 // HTTP Client
 var httpClient = &http.Client{
 	Timeout: time.Second * 10,
@@ -71,6 +73,7 @@ func main() {
 
 	genCubariData(P)
 	saveProjectsToDisk(P)
+	os.WriteFile("commit_msg", []byte(commit_msg), 0644)
 }
 
 func updateChapterMap(P []Project) {
@@ -94,6 +97,7 @@ func fetchNewChapters(P []Project) []Project {
 				// fetch images
 				Projects[i].Chapters[c].Images = getChapterImages(Projects[i].Chapters[c].Url)
 				fmt.Println("New", ch.Title)
+				commit_msg = commit_msg + ch.Title + "\n"
 			} else {
 				// Already seen
 				Projects[i].Chapters[c] = ChapterMap[ch.Url]
@@ -140,7 +144,6 @@ func genCubariData(P []Project) {
 		os.Mkdir("./data", 0755)
 		filename := "./data/" + m.Title + ".json"
 		filename = strings.ReplaceAll(filename, " ", "_")
-		fmt.Println(filename)
 		json, err := json.MarshalIndent(m, "", "\t")
 		if err != nil {
 			log.Fatal(err)
