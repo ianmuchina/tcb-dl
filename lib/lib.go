@@ -132,7 +132,7 @@ func FetchAllData() []Project {
 		for ch_id, ch := range Projects[i].Chapters {
 			ch.Images = FetchChapterImages(ch.Url)
 			Projects[i].Chapters[ch_id] = ch
-			//fmt.Println("New", ch.Title)
+			fmt.Println("New", ch.Title)
 			//commit_msg = commit_msg + ch.Title + "\n"
 		}
 	}
