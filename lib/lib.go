@@ -201,10 +201,16 @@ func FetchProjects() []Project {
 }
 
 func SaveProjectsToDisk(Projects []Project) {
-	json, _ := json.MarshalIndent(Projects, "", "\t")
+	json, err := json.MarshalIndent(Projects, "", "\t")
+	if err != nil {
+		log.Fatal(err)
+	}
 	os.WriteFile("projects.json", json, 0644)
-	// yaml, _ := yaml.Marshal(Projects)
-	// os.WriteFile("projects.yml", yaml, 0644)
+	yaml, _ := yaml.Marshal(Projects)
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.WriteFile("projects.yml", yaml, 0644)
 }
 
 func GetProjectImageAndDescription(url string) (string, string) {
