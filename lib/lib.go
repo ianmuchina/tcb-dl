@@ -221,7 +221,7 @@ func GetProjectImageAndDescription(url string) (string, string) {
 
 // sync
 func FetchProjectChapters(url string) ChapterDict {
-	var Result map[float64]Chapter
+	var Result map[float64]Chapter = make(map[float64]Chapter)
 
 	fetch(base + url).
 		Find("div .block.border.border-border.bg-card.mb-3.p-3 ").
