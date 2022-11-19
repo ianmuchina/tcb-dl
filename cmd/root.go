@@ -15,7 +15,9 @@ var rootCmd = &cobra.Command{
 	Long:  "",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	// Run: func(cmd *cobra.Command, args []string) {
+	// 	lib.Opt(lib.LoadLocalData())
+	// },
 }
 
 var downloadCmd = &cobra.Command{
@@ -23,10 +25,7 @@ var downloadCmd = &cobra.Command{
 	Aliases: []string{"dl"},
 	Short:   "Download Chapter",
 	Run: func(cmd *cobra.Command, args []string) {
-		ch := cmd.Flag("chapter")
-		prj := cmd.Flag("project")
-
-		fmt.Println(ch.Value, prj.Value)
+		lib.FindChapter(Project, float64(Chapter))
 	},
 }
 
@@ -35,7 +34,9 @@ var downloadLatestCmd = &cobra.Command{
 	Aliases: []string{"latest"},
 	Short:   "Download Latest Chapter",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Downloading latest")
+		fmt.Println(
+			lib.GetLatest(Project).Title,
+		)
 	},
 }
 
@@ -52,6 +53,7 @@ var syncAll = &cobra.Command{
 	Short: "Refresh all chapter data",
 	Run: func(cmd *cobra.Command, args []string) {
 		lib.SyncAll()
+		fmt.Println("Done")
 	},
 }
 
@@ -65,8 +67,8 @@ var syncNew = &cobra.Command{
 }
 
 // Flags
-var Chapter float32
-var Project uint8
+var Chapter float64
+var Project int
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -92,11 +94,15 @@ func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
 	// Download
-	downloadCmd.Flags().Float32VarP(&Chapter, "chapter", "c", 0, "")
-	downloadCmd.Flags().Uint8VarP(&Project, "project", "p", 5, "")
+	downloadCmd.Flags().Float64VarP(&Chapter, "chapter", "c", 0, "")
+	downloadCmd.Flags().IntVarP(&Project, "project", "p", 5, "")
 
 	downloadCmd.MarkFlagRequired("project")
 	downloadCmd.MarkFlagRequired("chapter")
+
+	downloadLatestCmd.Flags().IntVarP(&Project, "project", "p", 5, "")
+	downloadLatestCmd.MarkFlagRequired("project")
+
 	downloadCmd.AddCommand(downloadLatestCmd)
 
 	syncCmd.AddCommand(syncAll, syncNew)

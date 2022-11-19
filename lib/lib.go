@@ -9,48 +9,33 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
-// Todo: Methods instead of functions
+type ChapterDict map[float64]Chapter
+
 type Project struct {
-	Title       string    `json:"Title"`
-	Description string    `json:"Description,omitempty"`
-	Url         string    `json:"Url"`
-	Image       string    `json:"Image,omitempty"`
-	Chapters    []Chapter `json:"Chapters,omitempty"`
+	Title       string              `json:"Title,omitempty"`
+	Description string              `json:"Description,omitempty"`
+	Url         string              `json:"Url,omitempty"`
+	Image       string              `json:"Image,omitempty"`
+	Chapters    map[float64]Chapter `json:"Chapters,omitempty"`
+	Id          int                 `json:"Id,omitempty"`
 }
 
 type Chapter struct {
-	Index       string  `json:",omitempty"`
-	Title       string  `json:",omitempty"`
-	Url         string  `json:",omitempty"`
-	Description string  `json:",omitempty"`
-	Images      []Image `json:",omitempty"`
+	Index       float64 `json:"Index,omitempty"`
+	Title       string  `json:"Title,omitempty"`
+	Url         string  `json:"Url,omitempty"`
+	Description string  `json:"Description,omitempty"`
+	Images      []Image `json:"Images,omitempty"`
 }
 
 type Image struct {
 	Src string
 	Alt string
-}
-
-type CubariManga struct {
-	Title       string                   `json:"title"`
-	Description string                   `json:"description"`
-	Artist      string                   `json:"artist"`
-	Author      string                   `json:"author"`
-	Cover       string                   `json:"cover"`
-	Chapters    map[string]CubariChapter `json:"chapters"`
-}
-
-type CubariChapter struct {
-	Title        string              `json:"title"`
-	Volume       string              `json:"volume"`
-	Groups       map[string][]string `json:"groups"`
-	Last_updated string
 }
 
 const base = "https://onepiecechapters.com"
@@ -62,9 +47,12 @@ var httpClient = &http.Client{
 	Timeout: time.Second * 10,
 }
 
-var ChapterMap map[string]Chapter = make(map[string]Chapter, 4000)
+var ProjectsArr []Project
 
-var Pmap = map[int]string{
+var ExistingChapters map[string]Chapter = make(map[string]Chapter, 4000)
+
+// TODO: Map to Actual Structs
+var ProjectsMap = map[int]string{
 	1:  "/mangas/1/ace-novel-manga-adaptation",
 	2:  "/mangas/2/bleach",
 	3:  "/mangas/3/black-clover",
@@ -81,13 +69,13 @@ var Pmap = map[int]string{
 }
 
 func SyncAll() {
-	P := LoadLocalData()
-	UpdateChapterMap(P)
+	//P := LoadLocalData()
+	//UpdateChapterMap(P)
 
-	P = FetchAllChapters(P)
-	P = CleanData(P)
+	P := FetchAllData()
 
-	GenCubariData(P)
+	SaveCubariData(P)
+	SaveProjectsToDisk(P)
 	os.WriteFile("commit_msg", []byte(commit_msg), 0644)
 }
 
@@ -96,37 +84,37 @@ func SyncNew() {
 	UpdateChapterMap(P)
 
 	P = FetchNewChapters(P)
-	P = CleanData(P)
 
-	GenCubariData(P)
+	SaveCubariData(P)
 	os.WriteFile("commit_msg", []byte(commit_msg), 0644)
 }
 
 func UpdateChapterMap(P []Project) {
 	for _, p := range P {
 		for _, c := range p.Chapters {
-			ChapterMap[c.Url] = c
+			ExistingChapters[c.Url] = c
 		}
 	}
 }
 
 func FetchNewChapters(P []Project) []Project {
-	Projects := UpdateProjects()
+	Projects := FetchProjects()
 
 	for i := 0; i < len(Projects); i++ {
-		Projects[i].Chapters = GetProjectChapters(Projects[i].Url)
-		for c := 0; c < len(Projects[i].Chapters); c++ {
+		Projects[i].Chapters = FetchProjectChapters(Projects[i].Url)
 
-			ch := Projects[i].Chapters[c]
+		for ch_id, ch := range Projects[i].Chapters {
+
 			// If new chapter
-			if _, ok := ChapterMap[ch.Url]; !ok {
+			if _, ok := ExistingChapters[ch.Url]; !ok {
 				// fetch images
-				Projects[i].Chapters[c].Images = GetChapterImages(Projects[i].Chapters[c].Url)
+				ch.Images = FetchChapterImages(ch.Url)
+				Projects[i].Chapters[ch_id] = ch
 				fmt.Println("New", ch.Title)
 				commit_msg = commit_msg + ch.Title + "\n"
 			} else {
 				// Already seen
-				Projects[i].Chapters[c] = ChapterMap[ch.Url]
+				Projects[i].Chapters[ch_id] = ExistingChapters[ch.Url]
 			}
 		}
 	}
@@ -134,15 +122,15 @@ func FetchNewChapters(P []Project) []Project {
 	return Projects
 }
 
-func FetchAllChapters(P []Project) []Project {
-	Projects := UpdateProjects()
-
+// Go through every chapter and fetch every image
+func FetchAllData() []Project {
+	Projects := FetchProjects()
 	for i := 0; i < len(Projects); i++ {
-		Projects[i].Chapters = GetProjectChapters(Projects[i].Url)
-		for c := 0; c < len(Projects[i].Chapters); c++ {
-
-			ch := Projects[i].Chapters[c]
-			Projects[i].Chapters[c].Images = GetChapterImages(ch.Url)
+		// Chapters
+		Projects[i].Chapters = FetchProjectChapters(Projects[i].Url)
+		for ch_id, ch := range Projects[i].Chapters {
+			ch.Images = FetchChapterImages(ch.Url)
+			Projects[i].Chapters[ch_id] = ch
 			fmt.Println("New", ch.Title)
 			commit_msg = commit_msg + ch.Title + "\n"
 		}
@@ -151,22 +139,14 @@ func FetchAllChapters(P []Project) []Project {
 	return Projects
 }
 
-func CleanData(Projects []Project) []Project {
-	re := regexp.MustCompile("[0-9.]+")
+var re = regexp.MustCompile("[0-9.]+")
 
-	for i, p := range Projects {
-		for j, c := range p.Chapters {
-
-			x, err := strconv.ParseFloat(re.FindAllString(c.Title, -1)[0], 32)
-			if err != nil {
-				log.Fatal(err)
-			}
-			Projects[i].Chapters[j].Index = fmt.Sprintf("%g", x)
-		}
+func getChapterIdFromTitle(Title string) float64 {
+	id, err := strconv.ParseFloat(re.FindAllString(Title, -1)[0], 32)
+	if err != nil {
+		log.Fatal(err)
 	}
-
-	SaveProjectsToDisk(Projects)
-	return Projects
+	return id
 }
 
 func LoadLocalData() []Project {
@@ -183,60 +163,7 @@ func LoadLocalData() []Project {
 	return tmp
 }
 
-func GenCubariData(P []Project) {
-	for _, m := range ExportCubariData(P) {
-		os.Mkdir("./data", 0755)
-		filename := "./data/" + m.Title + ".json"
-		filename = strings.ReplaceAll(filename, " ", "_")
-		json, err := json.MarshalIndent(m, "", "\t")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		err = os.WriteFile(filename, json, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-}
-
-func ExportCubariData(Projects []Project) []CubariManga {
-	var Result []CubariManga
-	for _, P := range Projects {
-		Manga := CubariManga{
-			Title:       P.Title,
-			Description: P.Description,
-			Artist:      "Unknown",
-			Author:      "Unknown",
-			Cover:       P.Image,
-			Chapters:    make(map[string]CubariChapter, len(P.Chapters)),
-		}
-
-		for _, C := range P.Chapters {
-			// Sort Chapter Images
-			var imgs []string
-			for _, I := range C.Images {
-				imgs = append(imgs, I.Src)
-			}
-			G := map[string][]string{
-				"tcbscans": imgs,
-			}
-
-			Chp := CubariChapter{
-				Title:  C.Title,
-				Groups: G,
-			}
-
-			Manga.Chapters[C.Index] = Chp
-		}
-
-		Result = append(Result, Manga)
-	}
-
-	return Result
-}
-
-func UpdateProjects() []Project {
+func FetchProjects() []Project {
 	var Result []Project
 	// fetch latest chapters
 	fetch("https://onepiecechapters.com/projects").
@@ -292,8 +219,8 @@ func GetProjectImageAndDescription(url string) (string, string) {
 }
 
 // sync
-func GetProjectChapters(url string) []Chapter {
-	var Result []Chapter
+func FetchProjectChapters(url string) ChapterDict {
+	var Result map[float64]Chapter
 
 	fetch(base + url).
 		Find("div .block.border.border-border.bg-card.mb-3.p-3 ").
@@ -312,13 +239,14 @@ func GetProjectChapters(url string) []Chapter {
 			// Get Chapter Description
 			C.Description = s.Find("div .text-gray-500").Text()
 
-			Result = append(Result, C)
+			C.Index = getChapterIdFromTitle(C.Title)
+			Result[C.Index] = C
 		})
 	return Result
 }
 
 // Return array of image sources and their respective permalinks
-func GetChapterImages(url string) []Image {
+func FetchChapterImages(url string) []Image {
 	var Result []Image
 	fetch(base + url).
 		Find("img.fixed-ratio-content").
@@ -360,58 +288,51 @@ func fetch(url string) *goquery.Document {
 	return doc
 
 }
-func DownloadChapter(prj int, ch string) {
 
-	P := LoadLocalData()
-	var x Project
-	for _, p := range P {
-		if p.Url == Pmap[prj] {
-			x = p
+func FindChapter(ProjectId int, ChapterId float64) Chapter {
+	Projects := LoadLocalData()
+
+	var Project Project
+	var Chapter Chapter
+
+	// Select Project
+	// TODO: Make Faster
+	for _, p := range Projects {
+		if p.Url == ProjectsMap[ProjectId] {
+			Project = p
 		}
 	}
 
-	var max float64 = 0
-	var maxCh Chapter
-	// Get largest Chapter
-	for _, c := range x.Chapters {
-		cur, err := strconv.ParseFloat(c.Index, 32)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if cur > max {
-			max = cur
-			maxCh = c
+	// Select Chapter
+	// TODO: Make Faster
+	for _, ch := range Project.Chapters {
+		if ChapterId == ch.Index {
+			Chapter = ch
 		}
 	}
 
-	return maxCh
-
+	return Chapter
 }
 
-func GetLatest(i int) Chapter {
-	P := LoadLocalData()
-	var x Project
-	for _, p := range P {
-		if p.Url == Pmap[i] {
-			x = p
+// Returns Latest Chapter
+func GetLatest(ProjectId int) Chapter {
+	var Data []Project = LoadLocalData()
+	var Project Project
+
+	// Select Project
+	for _, p := range Data {
+		if p.Url == ProjectsMap[ProjectId] {
+			Project = p
 		}
 	}
 
 	var max float64 = 0
 	var maxCh Chapter
 	// Get largest Chapter
-	for _, c := range x.Chapters {
-		cur, err := strconv.ParseFloat(c.Index, 32)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if cur > max {
-			max = cur
-			maxCh = c
+	for _, ch := range Project.Chapters {
+		if ch.Index > max {
+			max = ch.Index
+			maxCh = ch
 		}
 	}
 
