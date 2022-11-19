@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+l
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -125,14 +126,15 @@ func FetchNewChapters(P []Project) []Project {
 // Go through every chapter and fetch every image
 func FetchAllData() []Project {
 	Projects := FetchProjects()
+	commit_msg = "update data"
 	for i := 0; i < len(Projects); i++ {
 		// Chapters
 		Projects[i].Chapters = FetchProjectChapters(Projects[i].Url)
 		for ch_id, ch := range Projects[i].Chapters {
 			ch.Images = FetchChapterImages(ch.Url)
 			Projects[i].Chapters[ch_id] = ch
-			fmt.Println("New", ch.Title)
-			commit_msg = commit_msg + ch.Title + "\n"
+			//fmt.Println("New", ch.Title)
+			//commit_msg = commit_msg + ch.Title + "\n"
 		}
 	}
 
