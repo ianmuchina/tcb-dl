@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-l
 	"github.com/PuerkitoBio/goquery"
 )
 
