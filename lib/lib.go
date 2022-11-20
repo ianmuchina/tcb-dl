@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -69,13 +71,10 @@ var ProjectsMap = map[int]string{
 }
 
 func SyncAll() {
-	//P := LoadLocalData()
-	//UpdateChapterMap(P)
+	Projects := FetchAllData()
 
-	P := FetchAllData()
-
-	SaveCubariData(P)
-	SaveProjectsToDisk(P)
+	SaveCubariData(Projects)
+	SaveProjectsToDisk(Projects)
 	os.WriteFile("commit_msg", []byte(commit_msg), 0644)
 }
 
@@ -201,12 +200,13 @@ func FetchProjects() []Project {
 }
 
 func SaveProjectsToDisk(Projects []Project) {
-	json, err := json.MarshalIndent(Projects, "", "\t")
-	if err != nil {
-		log.Fatal(err)
-	}
-	os.WriteFile("projects.json", json, 0644)
-	yaml, _ := yaml.Marshal(Projects)
+	// json, err := json.MarshalIndent(Projects, "", "\t")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// os.WriteFile("projects.json", json, 0644)
+
+	yaml, err := yaml.Marshal(Projects)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -283,7 +283,10 @@ func fetch(url string) *goquery.Document {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		body, _ := io.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
 		res.Body.Close()
 		log.Fatalf("status code error: %d %s\n%s", res.StatusCode, res.Status, body)
 	}
