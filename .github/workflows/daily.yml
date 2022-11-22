@@ -1,7 +1,8 @@
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "37 * * * *"
+  # schedule:
+    # At 21:42 everyday
+    # - cron: "13 23 * * *"
 
 jobs:
   getActive:

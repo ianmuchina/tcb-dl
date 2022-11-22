@@ -1,7 +1,9 @@
 package lib
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -9,8 +11,10 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
+	"go.uber.org/ratelimit"
 	"gopkg.in/yaml.v3"
 
 	"github.com/PuerkitoBio/goquery"
@@ -19,20 +23,21 @@ import (
 type ChapterDict map[float64]Chapter
 
 type Project struct {
-	Title       string              `json:"Title,omitempty"`
-	Description string              `json:"Description,omitempty"`
-	Url         string              `json:"Url,omitempty"`
-	Image       string              `json:"Image,omitempty"`
-	Chapters    map[float64]Chapter `json:"Chapters,omitempty"`
-	Id          int                 `json:"Id,omitempty"`
+	Title       string
+	Description string
+	Url         string
+	Image       string
+	Chapters    map[float64]Chapter
+	Id          int
 }
 
 type Chapter struct {
-	Index       float64 `json:"Index,omitempty"`
-	Title       string  `json:"Title,omitempty"`
-	Url         string  `json:"Url,omitempty"`
-	Description string  `json:"Description,omitempty"`
-	Images      []Image `json:"Images,omitempty"`
+	Index       float64
+	Title       string
+	Url         string
+	Description string
+	Images      []Image
+	Date        string
 }
 
 type Image struct {
@@ -44,14 +49,16 @@ const base = "https://onepiecechapters.com"
 
 var commit_msg string = ""
 
-// HTTP Client
+// per second
+var rl = ratelimit.New(25)
+
 var httpClient = &http.Client{
 	Timeout: time.Second * 10,
 }
 
 var ProjectsArr []Project
 
-var ExistingChapters map[string]Chapter = make(map[string]Chapter, 4000)
+var newChapters = []Chapter{}
 
 // TODO: Map to Actual Structs
 var ProjectsMap = map[int]string{
@@ -70,153 +77,225 @@ var ProjectsMap = map[int]string{
 	15: "/mangas/15/hunter-x-hunter",
 }
 
-func SyncAll() {
-	Projects := FetchAllData()
-
-	SaveCubariData(Projects)
-	SaveProjectsToDisk(Projects)
-	os.WriteFile("commit_msg", []byte(commit_msg), 0644)
-}
-
 func SyncNew() {
-	P := LoadLocalData()
-	UpdateChapterMap(P)
+	var P = []Project{}
 
-	P = FetchNewChapters(P)
+	P = loadLocalData()
+	updateExistingChapters(P)
+	fmt.Println(len(existingChapters), "Chapters")
 
+	P = fetchNewData(P)
+	updateExistingChapters(P)
+	fmt.Println(len(existingChapters))
+
+	saveProjectsToDisk(P)
 	SaveCubariData(P)
-	os.WriteFile("commit_msg", []byte(commit_msg), 0644)
+	genCommitMsg()
 }
 
-func UpdateChapterMap(P []Project) {
+var existingChapters = make(map[string]Chapter, 4000)
+
+func updateExistingChapters(P []Project) {
+
 	for _, p := range P {
 		for _, c := range p.Chapters {
-			ExistingChapters[c.Url] = c
+			existingChapters[c.Url] = c
 		}
 	}
+
 }
 
-func FetchNewChapters(P []Project) []Project {
-	Projects := FetchProjects()
+// Faster than fetchAllData
+func fetchNewData(P []Project) []Project {
+	Projects := P
 
-	for i := 0; i < len(Projects); i++ {
-		Projects[i].Chapters = FetchProjectChapters(Projects[i].Url)
+	var wg sync.WaitGroup
+	wg.Add(len(Projects))
 
-		for ch_id, ch := range Projects[i].Chapters {
+	for projectId, project := range Projects {
+		go func(projectId int, project Project) {
+			defer wg.Done()
+			for chapterId, chapter := range fetchProjectChapters(project.Url) {
+				if _, ok := existingChapters[chapter.Url]; !ok {
+					chapter.Images = fetchChapterImages(chapter.Url)
+					chapter.Date = getDate(chapter)
 
-			// If new chapter
-			if _, ok := ExistingChapters[ch.Url]; !ok {
-				// fetch images
-				ch.Images = FetchChapterImages(ch.Url)
-				Projects[i].Chapters[ch_id] = ch
-				fmt.Println("New", ch.Title)
-				commit_msg = commit_msg + ch.Title + "\n"
-			} else {
-				// Already seen
-				Projects[i].Chapters[ch_id] = ExistingChapters[ch.Url]
+					Projects[projectId].Chapters[chapterId] = chapter
+					newChapters = append(newChapters, chapter)
+
+					fmt.Println("new", chapter.Title)
+				} else {
+					Projects[projectId].Chapters[chapterId] = existingChapters[chapter.Url]
+				}
 			}
-		}
+		}(projectId, project)
 	}
+	wg.Wait()
 
 	return Projects
+}
+
+func SyncAll() {
+	Projects := fetchAllData()
+
+	// SaveCubariData(Projects)
+	saveProjectsToDisk(Projects)
+
+	// err := os.WriteFile("commit_msg", []byte(commit_msg), 0644)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 }
 
 // Go through every chapter and fetch every image
-func FetchAllData() []Project {
-	Projects := FetchProjects()
-	commit_msg = "update data"
-	for i := 0; i < len(Projects); i++ {
-		// Chapters
-		Projects[i].Chapters = FetchProjectChapters(Projects[i].Url)
-		for ch_id, ch := range Projects[i].Chapters {
-			ch.Images = FetchChapterImages(ch.Url)
-			Projects[i].Chapters[ch_id] = ch
-			fmt.Println("New", ch.Title)
-			//commit_msg = commit_msg + ch.Title + "\n"
-		}
+func fetchAllData() []Project {
+	Projects := fetchProjects()
+	// commit_msg = "update data"
+	var wg sync.WaitGroup
+	wg.Add(len(Projects))
+
+	for i := range Projects {
+		go func(i int) {
+			Projects[i].Chapters = fetchProjectChapters(Projects[i].Url)
+
+			var wg2 sync.WaitGroup
+			for ch_id, ch := range Projects[i].Chapters {
+				wg2.Add(len(Projects[i].Chapters))
+				go func(ch_id float64, ch Chapter) {
+					ch.Images = fetchChapterImages(ch.Url)
+					Projects[i].Chapters[ch_id] = ch
+					fmt.Println(ch.Title)
+					wg2.Done()
+				}(ch_id, ch)
+				wg2.Wait()
+			}
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
 
 	return Projects
+}
+
+func genCommitMsg() {
+	var suffix string = ""
+	if len(newChapters) > 1 {
+		suffix = "s"
+	}
+
+	var commit_msg = fmt.Sprintln("Added", len(newChapters), "New Chapter", suffix)
+	for _, ch := range newChapters {
+		commit_msg = fmt.Sprintln(commit_msg, ch.Title)
+	}
+	fmt.Println(commit_msg)
+	err := os.WriteFile("commit_msg", []byte(commit_msg), 0644)
+	checkErr(err)
 }
 
 var re = regexp.MustCompile("[0-9.]+")
 
-func getChapterIdFromTitle(Title string) float64 {
-	id, err := strconv.ParseFloat(re.FindAllString(Title, -1)[0], 32)
-	if err != nil {
-		log.Fatal(err)
+func loadLocalData() []Project {
+	if yamlIn {
+
+		Result := []Project{}
+		f, err := os.ReadFile("./projects.yml")
+		checkErr(err)
+		err = yaml.Unmarshal(f, &Result)
+		checkErr(err)
+
+		return Result
+	} else {
+
+		Result := []Project{}
+		file, err := os.ReadFile("projects.bin")
+		checkErr(err)
+
+		buf := bytes.NewBuffer(file)
+
+		decoder := gob.NewDecoder(buf)
+		err = decoder.Decode(&Result)
+		checkErr(err)
+
+		return Result
 	}
-	return id
 }
 
-func LoadLocalData() []Project {
-	data, err := os.ReadFile("./projects.json")
-	if err != nil {
-		log.Fatal(err)
-	}
+var yamlOut = true
+var yamlIn = true
 
-	tmp := []Project{}
-	err = json.Unmarshal(data, &tmp)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return tmp
+func fileExists(filename string) bool {
+	_, err := os.Stat("/path/to/whatever")
+	return !errors.Is(err, os.ErrNotExist)
 }
 
-func FetchProjects() []Project {
+func saveProjectsToDisk(Projects []Project) {
+	if yamlOut {
+
+		yaml, err := yaml.Marshal(Projects)
+		checkErr(err)
+		os.WriteFile("projects.yml", yaml, 0644)
+
+	} else {
+
+		var b bytes.Buffer
+		e := gob.NewEncoder(&b)
+		if err := e.Encode(Projects); err != nil {
+			log.Fatal(err)
+		}
+
+		os.WriteFile("projects.bin", b.Bytes(), 0644)
+
+	}
+}
+
+func fetchProjects() []Project {
 	var Result []Project
-	// fetch latest chapters
-	fetch("https://onepiecechapters.com/projects").
+	var wg sync.WaitGroup
+	fetchDoc("https://onepiecechapters.com/projects").
 		Find("div .bg-card").
-		Each(func(i int, s *goquery.Selection) {
-			var P Project
-			// Title
-			P.Title = s.Find(".font-bold").Text()
-			// Url
-			url, attrExists := s.Find("a").Attr("href")
-			if attrExists {
-				P.Url = url
-			} else {
-				log.Fatalln("Error Getting Project Url")
-			}
+		Each(
+			func(i int, s *goquery.Selection) {
+				wg.Add(1)
+				go func(i int, s *goquery.Selection) {
 
-			// Chapter Image
-			image := s.Find("img")
-			src, imageExists := image.Attr("src")
-			if imageExists {
-				P.Image = src
-			} else {
-				log.Fatalln("Error Getting project image")
-			}
-			// Get Project Image & Description
-			// async
-			P.Image, P.Description = GetProjectImageAndDescription(P.Url)
-			// Append Project
-			Result = append(Result, P)
-		})
+					P := Project{}
+					// Title
+					P.Title = s.Find(".font-bold").Text()
 
-	// wait
+					// Url
+					url, attrExists := s.Find("a").Attr("href")
+					if attrExists {
+						P.Url = url
+					} else {
+						log.Fatalln("Error Getting Project Url")
+					}
+
+					image := s.Find("img")
+					src, imageExists := image.Attr("src")
+					if imageExists {
+						P.Image = src
+					} else {
+						log.Fatalln("Error Getting project image")
+					}
+
+					P.Image, P.Description = getProjectImageAndDescription(P.Url)
+
+					P.Chapters = make(ChapterDict)
+
+					Result = append(Result, P)
+					fmt.Println(P.Title)
+					wg.Done()
+				}(i, s)
+			})
+	wg.Wait()
+	fmt.Println("updated project list")
 	return Result
 }
 
-func SaveProjectsToDisk(Projects []Project) {
-	// json, err := json.MarshalIndent(Projects, "", "\t")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// os.WriteFile("projects.json", json, 0644)
-
-	yaml, err := yaml.Marshal(Projects)
-	if err != nil {
-		log.Fatal(err)
-	}
-	os.WriteFile("projects.yml", yaml, 0644)
-}
-
-func GetProjectImageAndDescription(url string) (string, string) {
+func getProjectImageAndDescription(url string) (string, string) {
 	var description string = ""
 	// Fetch Project
-	fetch(base + url).
+	fetchDoc(base + url).
 		Find(".order-1").
 		Each(func(i int, s *goquery.Selection) {
 			url = s.Find("img").AttrOr("src", "")
@@ -226,36 +305,35 @@ func GetProjectImageAndDescription(url string) (string, string) {
 }
 
 // sync
-func FetchProjectChapters(url string) ChapterDict {
-	var Result map[float64]Chapter = make(map[float64]Chapter)
+func fetchProjectChapters(url string) ChapterDict {
 
-	fetch(base + url).
+	var Result map[float64]Chapter = make(map[float64]Chapter, 3000)
+
+	fetchDoc(base + url).
 		Find("div .block.border.border-border.bg-card.mb-3.p-3 ").
 		// For Each Chapter
 		Each(func(i int, s *goquery.Selection) {
 			var C Chapter
-			// Get Chapter Permalink
 			val, exists := s.Attr("href")
-			if exists {
-				C.Url = val
-			} else {
+			if !exists {
 				log.Fatalln("Chapter Does not Exist")
 			}
-			// Get Chapter Uext
-			C.Title = s.Find("div .text-lg.font-bold").Text()
-			// Get Chapter Description
-			C.Description = s.Find("div .text-gray-500").Text()
+			C.Url = val
 
-			C.Index = getChapterIdFromTitle(C.Title)
+			C.Title = s.Find("div .text-lg.font-bold").Text()
+			C.Description = s.Find("div .text-gray-500").Text()
+			C.Index = ParseChapterId(C.Title)
+
 			Result[C.Index] = C
 		})
+
 	return Result
 }
 
 // Return array of image sources and their respective permalinks
-func FetchChapterImages(url string) []Image {
+func fetchChapterImages(url string) []Image {
 	var Result []Image
-	fetch(base + url).
+	fetchDoc(base + url).
 		Find("img.fixed-ratio-content").
 		Each(func(i int, s *goquery.Selection) {
 			var I Image
@@ -276,8 +354,11 @@ func FetchChapterImages(url string) []Image {
 	return Result
 }
 
-func fetch(url string) *goquery.Document {
+func fetchDoc(url string) *goquery.Document {
+	rl.Take()
 	res, err := httpClient.Get(url)
+	fmt.Println(url)
+
 	if err != nil {
 		log.Fatal(err, "Failed to Get Latest Chapters")
 	}
@@ -292,15 +373,14 @@ func fetch(url string) *goquery.Document {
 	}
 	// Load the HTML document
 	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	checkErr(err)
 	return doc
 
 }
 
 func FindChapter(ProjectId int, ChapterId float64) Chapter {
-	Projects := LoadLocalData()
+	Projects := loadLocalData()
 
 	var Project Project
 	var Chapter Chapter
@@ -325,8 +405,8 @@ func FindChapter(ProjectId int, ChapterId float64) Chapter {
 }
 
 // Returns Latest Chapter
-func GetLatest(ProjectId int) Chapter {
-	var Data []Project = LoadLocalData()
+func GetLatestChapter(ProjectId int) Chapter {
+	var Data []Project = loadLocalData()
 	var Project Project
 
 	// Select Project
@@ -347,4 +427,36 @@ func GetLatest(ProjectId int) Chapter {
 	}
 
 	return maxCh
+}
+
+func ParseChapterId(Title string) float64 {
+	id, err := strconv.ParseFloat(re.FindAllString(Title, -1)[0], 32)
+	checkErr(err)
+	return id
+}
+
+func checkErr(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func getDate(C Chapter) string {
+	rl.Take()
+	res, err := httpClient.Get(C.Images[0].Src)
+	checkErr(err)
+
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		body, err := io.ReadAll(res.Body)
+		checkErr(err)
+		res.Body.Close()
+		log.Fatalf("status code error: %d %s\n%s", res.StatusCode, res.Status, body)
+	}
+
+	return res.Header.Get("x-bz-upload-timestamp")
+}
+
+func hasInternet() bool {
+	return false
 }

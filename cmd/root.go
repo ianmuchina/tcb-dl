@@ -35,7 +35,7 @@ var downloadLatestCmd = &cobra.Command{
 	Short:   "Download Latest Chapter",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(
-			lib.GetLatest(Project).Title,
+			lib.GetLatestChapter(Project).Title,
 		)
 	},
 }

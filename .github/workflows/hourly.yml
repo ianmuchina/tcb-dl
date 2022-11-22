@@ -1,0 +1,22 @@
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "27 00-22 * * *"
+
+jobs:
+  getActive:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.19"
+
+      - name: Append new data to the json files
+        run: go run . sync new
+
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_user_name: GitHub Actions
+          commit_user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_author: Github Actions <41898282+github-actions[bot]@users.noreply.github.com>
