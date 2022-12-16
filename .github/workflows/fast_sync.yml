@@ -1,3 +1,4 @@
+# faster sync that runs more frequently
 on:
   workflow_dispatch:
   schedule:
