@@ -9,12 +9,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"sync"
 	"time"
 
-	"go.uber.org/ratelimit"
 	"gopkg.in/yaml.v3"
 
 	"github.com/PuerkitoBio/goquery"
@@ -49,16 +49,14 @@ const base = "https://onepiecechapters.com"
 
 var commit_msg string = ""
 
-// per second
-var rl = ratelimit.New(25)
-
 var httpClient = &http.Client{
-	Timeout: time.Second * 10,
+	Timeout: time.Second * 1000,
 }
 
 var ProjectsArr []Project
 
 var newChapters = []Chapter{}
+var ChapterMap map[string]*Chapter = make(map[string]*Chapter, 5000)
 
 // TODO: Map to Actual Structs
 var ProjectsMap = map[int]string{
@@ -105,6 +103,32 @@ func updateExistingChapters(P []Project) {
 
 }
 
+func DownloadChapter(name string, C Chapter) {
+	for Index, img := range C.Images {
+		res, err := httpClient.Get(img.Src)
+		checkErr(err)
+		defer res.Body.Close()
+		body, err := io.ReadAll(res.Body)
+		checkErr(err)
+		if res.StatusCode != 200 {
+			res.Body.Close()
+			log.Fatalf("status code error: %d %s\n%s", res.StatusCode, res.Status, body)
+		}
+		home, err := os.UserHomeDir()
+		checkErr(err)
+		dir := path.Join(home, "tcb-dl/", name, "/", C.Title)
+		err = os.MkdirAll(dir, 0644)
+		checkErr(err)
+
+		ext := "png"
+		img := fmt.Sprintf("%s/%d.%s", dir, Index, ext)
+
+		fmt.Println(img)
+		// os.Create(img)
+
+	}
+}
+
 // Faster than fetchAllData
 func fetchNewData(P []Project) []Project {
 	Projects := P
@@ -114,12 +138,11 @@ func fetchNewData(P []Project) []Project {
 
 	for projectId, project := range Projects {
 		go func(projectId int, project Project) {
-			defer wg.Done()
 			for chapterId, chapter := range fetchProjectChapters(project.Url) {
 				if _, ok := existingChapters[chapter.Url]; !ok {
 					chapter.Images = fetchChapterImages(chapter.Url)
 					chapter.Date = getDate(chapter)
-
+					fmt.Println(chapter.Date)
 					Projects[projectId].Chapters[chapterId] = chapter
 					newChapters = append(newChapters, chapter)
 
@@ -128,6 +151,7 @@ func fetchNewData(P []Project) []Project {
 					Projects[projectId].Chapters[chapterId] = existingChapters[chapter.Url]
 				}
 			}
+			wg.Done()
 		}(projectId, project)
 	}
 	wg.Wait()
@@ -138,17 +162,36 @@ func fetchNewData(P []Project) []Project {
 func SyncAll() {
 	Projects := fetchAllData()
 
-	// SaveCubariData(Projects)
+	SaveCubariData(Projects)
 	saveProjectsToDisk(Projects)
-
-	// err := os.WriteFile("commit_msg", []byte(commit_msg), 0644)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	genCommitMsg()
+	err := os.WriteFile("commit_msg", []byte(commit_msg), 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // Go through every chapter and fetch every image
 func fetchAllData() []Project {
+	Projects := fetchProjects()
+	commit_msg = "update data"
+
+	for i := range Projects {
+		Projects[i].Chapters = fetchProjectChapters(Projects[i].Url)
+
+		for ch_id, ch := range Projects[i].Chapters {
+			ch.Images = fetchChapterImages(ch.Url)
+			ch.Date = getDate(ch)
+
+			Projects[i].Chapters[ch_id] = ch
+			fmt.Println(ch.Title)
+		}
+	}
+
+	return Projects
+}
+
+func fetchAllDataAsnyc() []Project {
 	Projects := fetchProjects()
 	// commit_msg = "update data"
 	var wg sync.WaitGroup
@@ -159,21 +202,22 @@ func fetchAllData() []Project {
 			Projects[i].Chapters = fetchProjectChapters(Projects[i].Url)
 
 			var wg2 sync.WaitGroup
+			wg2.Add(len(Projects[i].Chapters))
+
 			for ch_id, ch := range Projects[i].Chapters {
-				wg2.Add(len(Projects[i].Chapters))
 				go func(ch_id float64, ch Chapter) {
 					ch.Images = fetchChapterImages(ch.Url)
 					Projects[i].Chapters[ch_id] = ch
 					fmt.Println(ch.Title)
 					wg2.Done()
 				}(ch_id, ch)
-				wg2.Wait()
 			}
+			wg2.Wait()
 			wg.Done()
 		}(i)
 	}
-	wg.Wait()
 
+	wg.Wait()
 	return Projects
 }
 
@@ -183,7 +227,7 @@ func genCommitMsg() {
 		suffix = "s"
 	}
 
-	var commit_msg = fmt.Sprintln("Added", len(newChapters), "New Chapter", suffix)
+	var commit_msg = fmt.Sprint("Added ", len(newChapters), " New Chapter", suffix, "\n")
 	for _, ch := range newChapters {
 		commit_msg = fmt.Sprintln(commit_msg, ch.Title)
 	}
@@ -355,7 +399,6 @@ func fetchChapterImages(url string) []Image {
 }
 
 func fetchDoc(url string) *goquery.Document {
-	rl.Take()
 	res, err := httpClient.Get(url)
 	fmt.Println(url)
 
@@ -442,7 +485,6 @@ func checkErr(err error) {
 }
 
 func getDate(C Chapter) string {
-	rl.Take()
 	res, err := httpClient.Get(C.Images[0].Src)
 	checkErr(err)
 

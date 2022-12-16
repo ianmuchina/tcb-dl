@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/ianmuchina/tcb-dl/lib"
 	"github.com/spf13/cobra"
@@ -34,9 +35,12 @@ var downloadLatestCmd = &cobra.Command{
 	Aliases: []string{"latest"},
 	Short:   "Download Latest Chapter",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(
-			lib.GetLatestChapter(Project).Title,
-		)
+		ch := lib.GetLatestChapter(Project)
+		prj := lib.ProjectsMap[Project]
+		s := strings.Split(prj, "/")
+
+		fmt.Println(ch.Title, s[3])
+		// lib.DownloadChapter(s[1], ch)
 	},
 }
 
