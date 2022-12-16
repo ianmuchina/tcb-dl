@@ -1,8 +1,9 @@
+# Refresh all data
 on:
   workflow_dispatch:
   schedule:
     # At 21:42 everyday
-    - cron: "13 23 * * *"
+    - cron: "13 23 * * WED"
 
 jobs:
   getActive:
